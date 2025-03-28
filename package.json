@@ -2,6 +2,7 @@
   "name": "@codeflash-ai/code-suggester",
   "description": "Library to propose code changes",
   "version": "5.0.2",
+  "version": "5.0.1",
   "license": "Apache-2.0",
   "author": "Google LLC",
   "engines": {
@@ -43,6 +44,10 @@
     "system-test": "c8 mocha build/system-test",
     "test": "c8 mocha build/test",
     "pretest": "npm run compile"
+  },
+  "exports": {
+    "./build/src/utils/diff-utils.js": "./build/src/utils/diff-utils.js",
+    "./build/src/github/review-pull-request.js": "./build/src/github/review-pull-request.js"
   },
   "dependencies": {
     "@octokit/rest": "^20.1.2",
