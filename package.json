@@ -1,5 +1,5 @@
 {
-  "name": "code-suggester",
+  "name": "@codeflash-ai/code-suggester",
   "description": "Library to propose code changes",
   "version": "5.0.3",
   "license": "Apache-2.0",
@@ -7,10 +7,16 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "bin": {
     "code-suggester": "./build/src/bin/code-suggester.js"
   },
-  "repository": "googleapis/code-suggester",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codeflash-ai/codeflash.git"
+  },
   "main": "build/src/index.js",
   "module": "build/src/index.js",
   "source": "build/src/index.js",
@@ -42,7 +48,7 @@
     "@octokit/rest": "^20.1.2",
     "@types/yargs": "^16.0.0",
     "async-retry": "^1.3.1",
-    "diff": "^5.0.0",
+    "diff": "^7.0.0",
     "glob": "^7.1.6",
     "parse-diff": "^0.11.0",
     "yargs": "^16.0.0"
