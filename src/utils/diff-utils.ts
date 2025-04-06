@@ -46,109 +46,91 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
   parseDiff(diff).forEach(file => {
     const filename = file.to ? file.to : file.from!;
     const hunks: Hunk[] = [];
+
     file.chunks.forEach(chunk => {
-      // Track different types of lines
-      const allAddedLines: {ln: number; content: string}[] = [];
-      const allDeletedLines: {ln: number; content: string}[] = [];
-      const allNormalLines: {ln: number; lnNew: number; content: string}[] = [];
-      // First pass: collect all changes by type
+      // Each chunk from parseDiff already represents a logical block of changes
+      // with oldStart, oldLines, newStart, newLines properties
+
+      // Track changes within this chunk
+      const addedLines: {ln: number; content: string}[] = [];
+      const deletedLines: {ln: number; content: string}[] = [];
+      const normalLines: {lnOld: number; lnNew: number; content: string}[] = [];
+
+      // Process all changes in this chunk
       chunk.changes.forEach(change => {
         if (change.content.includes('No newline at end of file')) {
           return;
         }
+
         const content = change.content.substring(1).replace(/[\n\r]+$/g, '');
 
         if (change.type === 'add') {
-          allAddedLines.push({
+          addedLines.push({
             ln: (change as any).ln || 0,
-            content: content,
+            content,
           });
         } else if (change.type === 'del') {
-          allDeletedLines.push({
+          deletedLines.push({
             ln: (change as any).ln || 0,
-            content: content,
+            content,
           });
         } else if (change.type === 'normal') {
-          allNormalLines.push({
-            ln: (change as any).ln1 || 0,
-            lnNew: (change as any).ln2 || 0, // New file line number
-            content: content,
+          normalLines.push({
+            lnOld: (change as any).ln1 || 0,
+            lnNew: (change as any).ln2 || 0,
+            content,
           });
         }
       });
-      // If no modifications, skip
-      if (allAddedLines.length === 0 && allDeletedLines.length === 0) return;
 
-      // Sort lines by line number as ParseDiff does not guarantee order
-      allAddedLines.sort((a, b) => a.ln - b.ln);
-      allDeletedLines.sort((a, b) => a.ln - b.ln);
-      allNormalLines.sort((a, b) => a.ln - b.ln);
-
-      // Identify the range to replace
-      let startLineToReplace: number;
-      let endLineToReplace: number;
-      if (allDeletedLines.length > 0) {
-        // If there are deletions, start with their range
-        const lastDelLine = allDeletedLines[allDeletedLines.length - 1].ln;
-        const lastAddedLine =
-          allAddedLines.length > 0
-            ? Math.max(...allAddedLines.map(a => a.ln))
-            : -1;
-
-        // Find neutral lines between additions and deletions
-        // Find the full change range
-        const allChangeLines = [...allAddedLines, ...allDeletedLines];
-        const earliestChangeLine = Math.min(
-          ...allChangeLines.map(line => line.ln)
-        );
-
-        // Include all normal lines that fall within this range
-        const relevantNormalLines = allNormalLines.filter(
-          normal =>
-            normal.ln >= earliestChangeLine &&
-            (normal.ln < lastDelLine || normal.lnNew < lastAddedLine)
-        );
-        // Calculate the full replacement range including relevant normal lines
-        const allRelevantLines = [...allDeletedLines, ...relevantNormalLines];
-        startLineToReplace = Math.min(...allRelevantLines.map(line => line.ln));
-        endLineToReplace = Math.max(...allRelevantLines.map(line => line.ln));
-      } else {
-        // Pure additions (no deletions)
-        // Use the first added line as the insertion point
-        startLineToReplace = allAddedLines[0].ln;
-        endLineToReplace = startLineToReplace;
+      // Skip empty chunks
+      if (addedLines.length === 0 && deletedLines.length === 0) {
+        return;
       }
+
+      // The chunk itself defines the range to replace in the old file
+      let oldStart = chunk.oldStart;
+      let oldEnd = chunk.oldStart + chunk.oldLines - 1;
+
+      // If there are no deletions, we need to determine an insertion point
+      if (deletedLines.length === 0) {
+        // For pure additions, use the chunk's oldStart as the insertion point
+        oldStart = oldEnd = chunk.oldStart;
+      }
+
       // Now build the new content
       const newContent: string[] = [];
 
-      // Normal processing: include additions and normal lines in the right order
-      const linesToInclude: {ln: number; content: string}[] = [];
+      // We'll use the new file line numbers to determine the order
+      const contentByNewLine: Map<number, string> = new Map();
 
-      // Add all the additions to our map
-      allAddedLines.forEach(line => {
-        linesToInclude.push({ln: line.ln, content: line.content});
-      });
-      // Add relevant normal lines that should be preserved
-      allNormalLines.forEach(line => {
-        // Only include normal lines within our replacement range if they haven't been replaced by additions
-        if (line.ln >= startLineToReplace && line.ln <= endLineToReplace) {
-          linesToInclude.push({ln: line.lnNew, content: line.content});
+      // Add normal lines with their new file line numbers
+      normalLines.forEach(line => {
+        // Only include normal lines that are within the chunk's old file range
+        if (line.lnOld >= oldStart && line.lnOld <= oldEnd) {
+          contentByNewLine.set(line.lnNew, line.content);
         }
       });
 
-      // Order the lines and build the final content
-      linesToInclude
-        .sort((a, b) => a.ln - b.ln)
-        .forEach(line => {
-          newContent.push(line.content);
-        });
+      // Add added lines (these will overwrite any normal lines at the same position)
+      addedLines.forEach(line => {
+        contentByNewLine.set(line.ln, line.content);
+      });
 
-      // Create the hunk with the replacement range
+      // Sort by new file line number and collect the content
+      const sortedLineNumbers = Array.from(contentByNewLine.keys()).sort(
+        (a, b) => a - b
+      );
+      sortedLineNumbers.forEach(ln => {
+        newContent.push(contentByNewLine.get(ln)!);
+      });
+
+      // Create the hunk using the chunk's original range and our new content
       const hunk: Hunk = {
-        oldStart: startLineToReplace,
-        oldEnd: endLineToReplace,
-        newStart: startLineToReplace,
-        newEnd: startLineToReplace + newContent.length - 1,
+        oldStart,
+        oldEnd,
+        newStart: chunk.newStart,
+        newEnd: chunk.newStart + newContent.length - 1,
         newContent,
       };
 
