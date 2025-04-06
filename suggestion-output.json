@@ -1,0 +1,12 @@
+{
+  "owner": "test-owner",
+  "repo": "test-repo",
+  "pull_number": 1,
+  "commit_id": "mock-sha",
+  "event": "COMMENT",
+  "body": "Some suggestions could not be made:\n* common_tags.py\n  * lines 8-10",
+  "headers": {
+    "accept": "application/vnd.github.comfort-fade-preview+json"
+  },
+  "comments": []
+}
