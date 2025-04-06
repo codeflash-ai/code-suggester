@@ -91,6 +91,10 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
         // If there are deletions, start with their range
         const firstDelLine = allDeletedLines[0].ln;
         const lastDelLine = allDeletedLines[allDeletedLines.length - 1].ln;
+        const lastAddedLine =
+          allAddedLines.length > 0
+            ? Math.max(...allAddedLines.map(a => a.ln))
+            : -1;
 
         // Find neutral lines between additions and deletions
         // Find the full change range
@@ -105,7 +109,8 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
         // Include all normal lines that fall within this range
         const relevantNormalLines = allNormalLines.filter(
           normal =>
-            normal.ln >= earliestChangeLine && normal.ln < latestChangeLine
+            normal.ln >= earliestChangeLine &&
+            (normal.ln < lastDelLine || normal.lnNew < lastAddedLine)
         );
         // Calculate the full replacement range including relevant normal lines
         const allRelevantLines = [...allDeletedLines, ...relevantNormalLines];
