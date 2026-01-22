@@ -189,7 +189,7 @@ index 123..456 100644
  line2`,
     expected: {
       oldStart: 1,
-      oldEnd: 1, // Special case: equal when inserting at line 1
+      oldEnd: 0, // GitHub API quirk: oldEnd < oldStart for insertions (even at line 1)
       newStart: 1,
       newEnd: 1,
       newContent: ['new first line'],

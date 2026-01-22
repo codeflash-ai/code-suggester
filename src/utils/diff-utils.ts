@@ -89,11 +89,10 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
       let oldEnd: number;
       let newStart: number;
       let newEnd: number;
-      
+
       if (allDeletedLines.length > 0) {
         // If there are deletions, start with their range
         const lastDelLine = allDeletedLines[allDeletedLines.length - 1].ln;
-        const firstDelLine = allDeletedLines[0].ln;
         const lastAddedLine =
           allAddedLines.length > 0
             ? Math.max(...allAddedLines.map(a => a.ln))
@@ -116,7 +115,7 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
         const allRelevantLines = [...allDeletedLines, ...relevantNormalLines];
         oldStart = Math.min(...allRelevantLines.map(line => line.ln));
         oldEnd = Math.max(...allRelevantLines.map(line => line.ln));
-        
+
         // Now build the new content
         const newContent: string[] = [];
         const linesToInclude: {ln: number; content: string}[] = [];
@@ -152,11 +151,13 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
           newStart = oldStart;
           newEnd = oldStart + newContent.length - 1;
         }
-        
+
         // Find previousLine and nextLine from normal lines
-        const previousLine = allNormalLines.find(n => n.ln === oldStart - 1)?.content;
+        const previousLine = allNormalLines.find(
+          n => n.ln === oldStart - 1
+        )?.content;
         const nextLine = allNormalLines.find(n => n.ln === oldEnd + 1)?.content;
-        
+
         // Create the hunk with the replacement range
         const hunk: Hunk = {
           oldStart,
@@ -174,31 +175,28 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
         // This makes oldEnd < oldStart, which is a GitHub API quirk for insertions
         const insertionLine = allAddedLines[0].ln;
         const newContent: string[] = [];
-        
+
         // Build new content from additions
         allAddedLines.forEach(line => {
           newContent.push(line.content);
         });
-        
-        if (insertionLine > 1) {
-          // Standard insertion: oldStart = insertionLine, oldEnd = insertionLine - 1
-          oldStart = insertionLine;
-          oldEnd = insertionLine - 1;
-          newStart = insertionLine;
-          newEnd = insertionLine + newContent.length - 1;
-        } else {
-          // If inserting at the very beginning (line 1)
-          oldStart = insertionLine;
-          oldEnd = insertionLine;
-          newStart = insertionLine;
-          newEnd = insertionLine + newContent.length - 1;
-        }
-        
+
+        // For all insertions (including at line 1):
+        // oldStart = insertionLine, oldEnd = insertionLine - 1 (GitHub API quirk)
+        oldStart = insertionLine;
+        oldEnd = insertionLine - 1;
+        newStart = insertionLine;
+        newEnd = insertionLine + newContent.length - 1;
+
         // Find previousLine and nextLine from normal lines
         // For insertions, previousLine is the line before insertionLine, nextLine is after
-        const previousLine = allNormalLines.find(n => n.ln === insertionLine - 1)?.content;
-        const nextLine = allNormalLines.find(n => n.ln === insertionLine)?.content;
-        
+        const previousLine = allNormalLines.find(
+          n => n.ln === insertionLine - 1
+        )?.content;
+        const nextLine = allNormalLines.find(
+          n => n.ln === insertionLine
+        )?.content;
+
         // Create the hunk with the replacement range
         const hunk: Hunk = {
           oldStart,

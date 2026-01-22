@@ -111,7 +111,7 @@ index 123..456 100644
       const hunks = parseAllHunks(diff);
       const hunk = hunks.get('file.txt')![0];
       assert.strictEqual(hunk.oldStart, 1);
-      assert.strictEqual(hunk.oldEnd, 1); // Special case: equal when inserting at line 1
+      assert.strictEqual(hunk.oldEnd, 0); // GitHub API quirk: oldEnd < oldStart for insertions
       assert.strictEqual(hunk.newStart, 1);
       assert.strictEqual(hunk.newEnd, 1);
       assert.deepStrictEqual(hunk.newContent, ['new first line']);
