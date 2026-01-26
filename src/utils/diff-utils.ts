@@ -85,8 +85,11 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
       allNormalLines.sort((a, b) => a.ln - b.ln);
 
       // Identify the range to replace
-      let startLineToReplace: number;
-      let endLineToReplace: number;
+      let oldStart: number;
+      let oldEnd: number;
+      let newStart: number;
+      let newEnd: number;
+
       if (allDeletedLines.length > 0) {
         // If there are deletions, start with their range
         const lastDelLine = allDeletedLines[allDeletedLines.length - 1].ln;
@@ -110,49 +113,102 @@ export function parseAllHunks(diff: string): Map<string, Hunk[]> {
         );
         // Calculate the full replacement range including relevant normal lines
         const allRelevantLines = [...allDeletedLines, ...relevantNormalLines];
-        startLineToReplace = Math.min(...allRelevantLines.map(line => line.ln));
-        endLineToReplace = Math.max(...allRelevantLines.map(line => line.ln));
+        oldStart = Math.min(...allRelevantLines.map(line => line.ln));
+        oldEnd = Math.max(...allRelevantLines.map(line => line.ln));
+
+        // Now build the new content
+        const newContent: string[] = [];
+        const linesToInclude: {ln: number; content: string}[] = [];
+
+        // Add all the additions to our map
+        allAddedLines.forEach(line => {
+          linesToInclude.push({ln: line.ln, content: line.content});
+        });
+        // Add relevant normal lines that should be preserved
+        allNormalLines.forEach(line => {
+          // Only include normal lines within our replacement range if they haven't been replaced by additions
+          if (line.ln >= oldStart && line.ln <= oldEnd) {
+            linesToInclude.push({ln: line.lnNew, content: line.content});
+          }
+        });
+
+        // Order the lines and build the final content
+        linesToInclude
+          .sort((a, b) => a.ln - b.ln)
+          .forEach(line => {
+            newContent.push(line.content);
+          });
+
+        // For deletions: newStart = oldStart, newEnd = oldStart - 1 (GitHub API quirk)
+        // For modifications: newStart = oldStart, newEnd = oldStart + newContent.length - 1
+        if (newContent.length === 0) {
+          // Pure deletion: newEnd < newStart (GitHub API quirk)
+          // newEnd = oldStart - 1 (the line before the deletion start)
+          newStart = oldStart;
+          newEnd = oldStart - 1;
+        } else {
+          // Modification or deletion with additions
+          newStart = oldStart;
+          newEnd = oldStart + newContent.length - 1;
+        }
+
+        // Find previousLine and nextLine from normal lines
+        const previousLine = allNormalLines.find(
+          n => n.ln === oldStart - 1
+        )?.content;
+        const nextLine = allNormalLines.find(n => n.ln === oldEnd + 1)?.content;
+
+        // Create the hunk with the replacement range
+        const hunk: Hunk = {
+          oldStart,
+          oldEnd,
+          newStart,
+          newEnd,
+          newContent,
+          ...(previousLine && {previousLine}),
+          ...(nextLine && {nextLine}),
+        };
+        hunks.push(hunk);
       } else {
         // Pure additions (no deletions)
-        // Use the first added line as the insertion point
-        startLineToReplace = allAddedLines[0].ln;
-        endLineToReplace = startLineToReplace;
-      }
-      // Now build the new content
-      const newContent: string[] = [];
+        // For GitHub API compatibility: oldStart = insertionLine, oldEnd = insertionLine - 1
+        // This makes oldEnd < oldStart, which is a GitHub API quirk for insertions
+        const insertionLine = allAddedLines[0].ln;
+        const newContent: string[] = [];
 
-      // Normal processing: include additions and normal lines in the right order
-      const linesToInclude: {ln: number; content: string}[] = [];
-
-      // Add all the additions to our map
-      allAddedLines.forEach(line => {
-        linesToInclude.push({ln: line.ln, content: line.content});
-      });
-      // Add relevant normal lines that should be preserved
-      allNormalLines.forEach(line => {
-        // Only include normal lines within our replacement range if they haven't been replaced by additions
-        if (line.ln >= startLineToReplace && line.ln <= endLineToReplace) {
-          linesToInclude.push({ln: line.lnNew, content: line.content});
-        }
-      });
-
-      // Order the lines and build the final content
-      linesToInclude
-        .sort((a, b) => a.ln - b.ln)
-        .forEach(line => {
+        // Build new content from additions
+        allAddedLines.forEach(line => {
           newContent.push(line.content);
         });
 
-      // Create the hunk with the replacement range
-      const hunk: Hunk = {
-        oldStart: startLineToReplace,
-        oldEnd: endLineToReplace,
-        newStart: startLineToReplace,
-        newEnd: startLineToReplace + newContent.length - 1,
-        newContent,
-      };
+        // For all insertions (including at line 1):
+        // oldStart = insertionLine, oldEnd = insertionLine - 1 (GitHub API quirk)
+        oldStart = insertionLine;
+        oldEnd = insertionLine - 1;
+        newStart = insertionLine;
+        newEnd = insertionLine + newContent.length - 1;
 
-      hunks.push(hunk);
+        // Find previousLine and nextLine from normal lines
+        // For insertions, previousLine is the line before insertionLine, nextLine is after
+        const previousLine = allNormalLines.find(
+          n => n.ln === insertionLine - 1
+        )?.content;
+        const nextLine = allNormalLines.find(
+          n => n.ln === insertionLine
+        )?.content;
+
+        // Create the hunk with the replacement range
+        const hunk: Hunk = {
+          oldStart,
+          oldEnd,
+          newStart,
+          newEnd,
+          newContent,
+          ...(previousLine && {previousLine}),
+          ...(nextLine && {nextLine}),
+        };
+        hunks.push(hunk);
+      }
     });
 
     if (hunks.length > 0) {

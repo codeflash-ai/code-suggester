@@ -79,8 +79,8 @@ describe('getRawSuggestionHunks', () => {
     assert.strictEqual(fileHunks.get(fileName2)![0].newEnd, 1);
     assert.strictEqual(fileHunks.get(fileName2)![1].oldStart, 16);
     assert.strictEqual(fileHunks.get(fileName2)![1].oldEnd, 16);
-    assert.strictEqual(fileHunks.get(fileName2)![1].newStart, 17);
-    assert.strictEqual(fileHunks.get(fileName2)![1].newEnd, 18);
+    assert.strictEqual(fileHunks.get(fileName2)![1].newStart, 16);
+    assert.strictEqual(fileHunks.get(fileName2)![1].newEnd, 17);
   });
 
   it('Does not generate hunks for changes that contain no updates', () => {

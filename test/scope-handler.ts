@@ -310,4 +310,97 @@ describe('partitionSuggestedHunksByScope', () => {
     assert.deepStrictEqual(validHunks.get('file1.txt'), [expectedHunk]);
     assert.strictEqual(invalidHunks.size, 0);
   });
+
+  it('handles single line change hunk correctly', () => {
+    const prHunk = {
+      oldStart: 10,
+      oldEnd: 20,
+      newStart: 10,
+      newEnd: 20,
+      newContent: ['line1', 'line2', 'line3', 'line4', 'line5', 'line6', 'line7', 'line8', 'line9', 'line10', 'line11'],
+    };
+    const pullRequestHunks: Map<string, Hunk[]> = new Map();
+    pullRequestHunks.set('file1.txt', [prHunk]);
+
+    // Single line change: oldStart === oldEnd, newStart === newEnd
+    const singleLineHunk = {
+      oldStart: 15,
+      oldEnd: 15,
+      newStart: 15,
+      newEnd: 15,
+      newContent: ['modified line'],
+    };
+    const suggestedHunks: Map<string, Hunk[]> = new Map();
+    suggestedHunks.set('file1.txt', [singleLineHunk]);
+
+    const {validHunks, invalidHunks} = partitionSuggestedHunksByScope(
+      pullRequestHunks,
+      suggestedHunks
+    );
+    assert.strictEqual(validHunks.get('file1.txt')!.length, 1);
+    assert.deepStrictEqual(validHunks.get('file1.txt'), [singleLineHunk]);
+    assert.strictEqual(invalidHunks.size, 0);
+  });
+
+  it('handles single line change at boundary of PR hunk', () => {
+    const prHunk = {
+      oldStart: 10,
+      oldEnd: 20,
+      newStart: 10,
+      newEnd: 20,
+      newContent: [],
+    };
+    const pullRequestHunks: Map<string, Hunk[]> = new Map();
+    pullRequestHunks.set('file1.txt', [prHunk]);
+
+    // Single line change at the start boundary
+    const singleLineHunk = {
+      oldStart: 10,
+      oldEnd: 10,
+      newStart: 10,
+      newEnd: 10,
+      newContent: ['modified'],
+    };
+    const suggestedHunks: Map<string, Hunk[]> = new Map();
+    suggestedHunks.set('file1.txt', [singleLineHunk]);
+
+    const {validHunks, invalidHunks} = partitionSuggestedHunksByScope(
+      pullRequestHunks,
+      suggestedHunks
+    );
+    assert.strictEqual(validHunks.get('file1.txt')!.length, 1);
+    assert.deepStrictEqual(validHunks.get('file1.txt'), [singleLineHunk]);
+    assert.strictEqual(invalidHunks.size, 0);
+  });
+
+  it('handles single line change at end boundary of PR hunk', () => {
+    const prHunk = {
+      oldStart: 10,
+      oldEnd: 20,
+      newStart: 10,
+      newEnd: 20,
+      newContent: [],
+    };
+    const pullRequestHunks: Map<string, Hunk[]> = new Map();
+    pullRequestHunks.set('file1.txt', [prHunk]);
+
+    // Single line change at the end boundary
+    const singleLineHunk = {
+      oldStart: 20,
+      oldEnd: 20,
+      newStart: 20,
+      newEnd: 20,
+      newContent: ['modified'],
+    };
+    const suggestedHunks: Map<string, Hunk[]> = new Map();
+    suggestedHunks.set('file1.txt', [singleLineHunk]);
+
+    const {validHunks, invalidHunks} = partitionSuggestedHunksByScope(
+      pullRequestHunks,
+      suggestedHunks
+    );
+    assert.strictEqual(validHunks.get('file1.txt')!.length, 1);
+    assert.deepStrictEqual(validHunks.get('file1.txt'), [singleLineHunk]);
+    assert.strictEqual(invalidHunks.size, 0);
+  });
 });
